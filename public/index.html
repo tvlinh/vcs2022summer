@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VCS</title>
+    <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
+    <script src="assets/polygon.js"></script>
+    <script>
+        var SCREEN_WIDTH = 1200;
+        var SCREEN_HEIGH = 1200;
+        var COLOR_WIN = "#00FF00";
+        var COLOR_LOST = "#FF0000";
+        var ITEM_WIDTH = 190;
+        var ITEM_HEIGHT = 60;
+        var ITEM_VS_WIDTH = 100;
+        var MASK_PADDING = 8;
+        var SCALE_WIN = 1.05;
+        var SCALE_LOST = 0.95;
+        var TIME_ANIMATION = 500;
+        var COLOR_WIN_ALPHA = 0.5;
+        var COLOR_LOST_ALPHA = 0.5;
+        var SPACING1 = 2*MASK_PADDING;
+        var SPACING2 = 74;
+        var STARTX = 600;
+        var STARTY = 330;
+        var EASE = createjs.Ease.getPowInOut(4);
+
+        function init() {
+            var stage = new createjs.Stage("canvas");
+
+            const params = new Proxy(new URLSearchParams(window.location.search), {
+                get: (searchParams, prop) => searchParams.get(prop),
+            });
+            let value = params.week; // "some_value"
+            var week;
+            if (!value) {
+                week = getWeek()
+            } else {
+                week = parseInt(value)
+                week = checkWeek(week)
+            }
+            var container = drawWeek(week);
+            stage.addChild(container);
+
+
+            stage.enableMouseOver(60);
+            stage.update();
+
+            createjs.Ticker.setFPS(60);
+            createjs.Ticker.addEventListener("tick", stage);
+        }
+        function drawWeek(week) {
+            var container = new createjs.Container();
+
+            var image = new Image(SCREEN_WIDTH, SCREEN_HEIGH);
+            image.src = './assets/images/week' + week + '.jpeg';
+
+            var bitmap = new createjs.Bitmap(image);
+
+            container.addChild(bitmap);
+
+            var y = STARTY;
+            for (i=1; i<=8; i++) {
+                drawGame(container, image, STARTX, y);
+                if (i%2 === 0) {
+                    y += ITEM_HEIGHT + SPACING2
+                } else {
+                    y += ITEM_HEIGHT + SPACING1
+                }
+            }
+            return container;
+        }
+        function drawGame(container, image, x, y) {
+            var choice = null;
+
+            var team1 = new createjs.Bitmap(image);
+            team1.x = x;
+            team1.y = y;
+
+            var maskTeam1Win = new createjs.Shape();
+            maskTeam1Win.alpha = 0;
+            maskTeam1Win.graphics.beginFill(COLOR_WIN).drawPolygon(
+                x-MASK_PADDING, y-MASK_PADDING,
+                x-MASK_PADDING, y-MASK_PADDING,
+                x+ITEM_WIDTH+ITEM_VS_WIDTH+MASK_PADDING, y-MASK_PADDING,
+                x+ITEM_WIDTH+MASK_PADDING, y+ITEM_HEIGHT+MASK_PADDING,
+                x-MASK_PADDING, y+ITEM_HEIGHT+MASK_PADDING);
+
+            var maskTeam1Lost = new createjs.Shape();
+            maskTeam1Lost.alpha = 0;
+            maskTeam1Lost.graphics.beginFill(COLOR_LOST).drawPolygon(
+                x, y,
+                x, y,
+                x+ITEM_WIDTH+ITEM_VS_WIDTH-2.5*MASK_PADDING, y,
+                x+ITEM_WIDTH, y + ITEM_HEIGHT,
+                x, y + ITEM_HEIGHT);
+
+            team1.sourceRect = new createjs.Rectangle(x,y,ITEM_WIDTH + ITEM_VS_WIDTH,ITEM_HEIGHT);
+            team1.mask = maskTeam1Win;
+            container.addChild(team1);
+
+            var team2 = new createjs.Bitmap(image);
+            team2.x = x + ITEM_WIDTH;
+            team2.y = y;
+            team2.sourceRect = new createjs.Rectangle(x + ITEM_WIDTH,y,ITEM_WIDTH + ITEM_VS_WIDTH,ITEM_HEIGHT);
+
+            var maskTeam2Win = new createjs.Shape();
+            maskTeam2Win.alpha = 0;
+            maskTeam2Win.graphics.beginFill(COLOR_WIN).drawPolygon(
+                x + ITEM_WIDTH, y + ITEM_HEIGHT + MASK_PADDING,
+                x + ITEM_WIDTH, y + ITEM_HEIGHT + MASK_PADDING,
+                x + ITEM_WIDTH + ITEM_VS_WIDTH, y - MASK_PADDING,
+                x + 2*ITEM_WIDTH + ITEM_VS_WIDTH + MASK_PADDING, y - MASK_PADDING,
+                x + 2*ITEM_WIDTH + ITEM_VS_WIDTH + MASK_PADDING, y + ITEM_HEIGHT + MASK_PADDING);
+            team2.mask = maskTeam2Win;
+
+            var maskTeam2Lost = new createjs.Shape();
+            maskTeam2Lost.alpha = 0;
+            maskTeam2Lost.graphics.beginFill(COLOR_LOST).drawPolygon(
+                x + ITEM_WIDTH + 3.5*MASK_PADDING, y + ITEM_HEIGHT,
+                x + ITEM_WIDTH + 3.5*MASK_PADDING, y + ITEM_HEIGHT,
+                x + ITEM_WIDTH + ITEM_VS_WIDTH + MASK_PADDING, y,
+                x + 2*ITEM_WIDTH + ITEM_VS_WIDTH, y,
+                x + 2*ITEM_WIDTH + ITEM_VS_WIDTH, y + ITEM_HEIGHT);
+
+            container.addChild(team2);
+            container.addChild(maskTeam1Win);
+            container.addChild(maskTeam2Win);
+            container.addChild(maskTeam1Lost);
+            container.addChild(maskTeam2Lost);
+
+            var focusTeam1 = function () {
+                var x1 = x - (SCALE_WIN-1)*(ITEM_WIDTH + ITEM_VS_WIDTH)/2.0;
+                var y1 = y - (SCALE_WIN-1)*ITEM_HEIGHT/2.0;
+                createjs.Tween.get(team1, {loop: false})
+                    .to({ scale: SCALE_WIN, x: x1, y: y1 }, TIME_ANIMATION, EASE)
+                createjs.Tween.get(maskTeam1Win, {loop: false})
+                    .to({ alpha: COLOR_LOST_ALPHA }, TIME_ANIMATION, EASE)
+            }
+            var unfocusTeam1 = function () {
+                if (choice !== team1) {
+                    createjs.Tween.get(team1, {loop: false})
+                        .to({scale: 1, x: x, y: y}, TIME_ANIMATION, EASE);
+                    createjs.Tween.get(maskTeam1Win, {loop: false})
+                        .to({alpha: 0}, TIME_ANIMATION, EASE);
+                }
+                if (choice === team2) {
+                    unchoiceTeam1();
+                }
+            }
+            var choiceTeam1 = function () {
+                focusTeam1();
+                unchoiceTeam2();
+                choice = team1
+                unfocusTeam2();
+            }
+            var unchoiceTeam1 = function () {
+                createjs.Tween.get(maskTeam2Lost, {loop: false})
+                    .to({ alpha: 0 }, TIME_ANIMATION, createjs.Ease.getPowInOut(4))
+                createjs.Tween.get(maskTeam1Lost, {loop: false})
+                    .to({ alpha: COLOR_LOST_ALPHA }, TIME_ANIMATION, createjs.Ease.getPowInOut(4))
+
+                var x2 = x - (SCALE_LOST-1)*(ITEM_WIDTH + ITEM_VS_WIDTH)/2.0;
+                var y2 = y - (SCALE_LOST-1)*ITEM_HEIGHT/2.0;
+                createjs.Tween.get(team1, {loop: false})
+                    .to({ scale: SCALE_LOST, x: x2, y: y2 }, TIME_ANIMATION, EASE)
+            }
+
+            var focusTeam2 = function () {
+                var x1 = x + ITEM_WIDTH - (SCALE_WIN-1.0)*(ITEM_WIDTH + ITEM_VS_WIDTH)/2.0;
+                var y1 = y - (SCALE_WIN-1.0)*ITEM_HEIGHT/2.0
+                createjs.Tween.get(team2, {loop: false})
+                    .to({ scale: SCALE_WIN, x: x1, y: y1 }, TIME_ANIMATION, EASE)
+                createjs.Tween.get(maskTeam2Win, {loop: false})
+                    .to({ alpha: COLOR_WIN_ALPHA }, TIME_ANIMATION, EASE)
+            }
+            var unfocusTeam2 = function () {
+                if (choice !== team2) {
+                    createjs.Tween.get(team2, {loop: false})
+                        .to({scale: 1, x: x + ITEM_WIDTH, y: y}, TIME_ANIMATION, EASE);
+                    createjs.Tween.get(maskTeam2Win, {loop: false})
+                        .to({alpha: 0 }, TIME_ANIMATION, EASE);
+                }
+                if (choice === team1) {
+                    unchoiceTeam2();
+                }
+            }
+            var choiceTeam2 = function () {
+                focusTeam2();
+                unchoiceTeam1();
+                choice = team2;
+                unfocusTeam1();
+            }
+            var unchoiceTeam2 = function () {
+                createjs.Tween.get(maskTeam1Lost, {loop: false})
+                    .to({ alpha: 0 }, TIME_ANIMATION, createjs.Ease.getPowInOut(4))
+
+                createjs.Tween.get(maskTeam2Lost, {loop: false})
+                    .to({ alpha: COLOR_LOST_ALPHA }, TIME_ANIMATION, createjs.Ease.getPowInOut(4))
+
+                var x1 = x + ITEM_WIDTH - (SCALE_LOST-1.0)*(ITEM_WIDTH + ITEM_VS_WIDTH)/2.0;
+                var y1 = y - (SCALE_LOST-1.0)*ITEM_HEIGHT/2.0
+                createjs.Tween.get(team2, {loop: false})
+                    .to({ scale: SCALE_LOST, x: x1, y: y1 }, TIME_ANIMATION, EASE)
+            }
+
+            team1.addEventListener("mouseover", focusTeam1);
+            team1.addEventListener("mouseout", unfocusTeam1);
+            team1.addEventListener("click", choiceTeam1);
+            team2.addEventListener("mouseover", focusTeam2);
+            team2.addEventListener("mouseout", unfocusTeam2);
+            team2.addEventListener("click", choiceTeam2);
+        }
+        function getWeek() {
+            var currentdate = new Date();
+            var oneJan = new Date(currentdate.getFullYear(),0,1);
+            var numberOfDays = Math.floor((currentdate - oneJan) / (24 * 60 * 60 * 1000));
+            var result = Math.ceil(( currentdate.getDay() + 1 + numberOfDays) / 7);
+            var week = result - 27;
+            return checkWeek(week);
+        }
+        function checkWeek(week) {
+            if (week <= 0) {
+                return 1;
+            }
+            if (week > 7) {
+                return 7;
+            }
+            return week;
+        }
+    </script>
+</head>
+<body onload="init();" style="width: 100%; height: 100%; margin: 0;">
+<canvas id="canvas" width="1200" height="1200" style="position: fixed; width: 100%; height: 100%;"></canvas>
+</body>
+</html>
